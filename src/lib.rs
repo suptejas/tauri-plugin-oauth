@@ -137,7 +137,7 @@ fn handle_connection(mut conn: TcpStream, response: Option<&str>, port: u16) -> 
     }
 
     let script = format!(
-        r#"<script>fetch("http://{}:{}/cb",{{headers:{{"Full-Url":window.location.href}}}})</script>"#,
+        r#"<script>setTimeout(() => fetch("http://{}:{}/cb",{{headers:{{"Full-Url":window.location.href}}}}), 100);</script>"#,
         if is_localhost {
             "localhost"
         } else {
