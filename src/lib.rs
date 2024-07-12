@@ -67,7 +67,7 @@ pub fn start_with_config<F: FnMut(String) + Send + 'static>(
     mut handler: F,
 ) -> Result<u16, std::io::Error> {
     let listener = match config.ports {
-        Some(ports) => {
+        Some(ref ports) => {
             let mut last_error = None;
             for &port in ports.iter() {
                 match TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port))) {
