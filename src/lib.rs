@@ -32,7 +32,7 @@ pub fn start<F: FnMut(String) + Send + 'static>(handler: F) -> Result<u16, std::
 }
 
 /// The optional server config.
-#[derive(Default, serde::Deserialize)]
+#[derive(Default, serde::Deserialize, Clone)]
 pub struct OauthConfig {
     /// An array of hard-coded ports the server should try to bind to.
     /// This should only be used if your oauth provider does not accept wildcard localhost addresses.
@@ -67,28 +67,39 @@ pub fn start_with_config<F: FnMut(String) + Send + 'static>(
     mut handler: F,
 ) -> Result<u16, std::io::Error> {
     let listener = match config.ports {
-        Some(ports) => TcpListener::bind(
-            ports
-                .iter()
-                .map(|p| SocketAddr::from(([127, 0, 0, 1], *p)))
-                .collect::<Vec<SocketAddr>>()
-                .as_slice(),
-        ),
-        None => TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0))),
-    }?;
+        Some(ports) => {
+            let mut last_error = None;
+            for &port in ports.iter() {
+                match TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port))) {
+                    Ok(listener) => return Ok(setup_listener(listener, config, handler)),
+                    Err(e) => last_error = Some(e),
+                }
+            }
+            return Err(last_error.unwrap_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::AddrNotAvailable, "No ports available")
+            }));
+        }
+        None => TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))?,
+    };
 
-    let port = listener.local_addr()?.port();
+    Ok(setup_listener(listener, config, handler))
+}
+
+fn setup_listener<F: FnMut(String) + Send + 'static>(
+    listener: TcpListener,
+    config: OauthConfig,
+    mut handler: F,
+) -> u16 {
+    let port = listener.local_addr().unwrap().port();
 
     thread::spawn(move || {
         for conn in listener.incoming() {
             match conn {
                 Ok(conn) => {
                     if let Some(url) = handle_connection(conn, config.response.as_deref(), port) {
-                        // Using an empty string to communicate that a shutdown was requested.
                         if !url.is_empty() {
                             handler(url);
                         }
-                        // TODO: Check if exiting here is always okay.
                         break;
                     }
                 }
@@ -99,7 +110,7 @@ pub fn start_with_config<F: FnMut(String) + Send + 'static>(
         }
     });
 
-    Ok(port)
+    port
 }
 
 fn handle_connection(mut conn: TcpStream, response: Option<&str>, port: u16) -> Option<String> {
