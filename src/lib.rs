@@ -174,15 +174,17 @@ fn handle_connection(mut conn: TcpStream, response: Option<&str>, port: u16) -> 
     };
 
     // TODO: Test if unwrapping here is safe (enough).
-    conn.write_all(
+        conn.write_all(
         format!(
-            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{}",
             response.len(),
             response
         )
         .as_bytes(),
     )
-    .unwrap();
+    .map_err(|e| log::error!("Failed to write response: {}", e))
+    .ok()?;
+
     conn.flush().unwrap();
 
     None
