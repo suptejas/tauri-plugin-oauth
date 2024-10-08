@@ -64,7 +64,7 @@ pub struct OauthConfig {
 /// The seperate server thread can panic if its unable to send the html response to the client. This may change after more real world testing.
 pub fn start_with_config<F: FnMut(String) + Send + 'static>(
     config: OauthConfig,
-    mut handler: F,
+    handler: F,
 ) -> Result<u16, std::io::Error> {
     let listener = match config.ports {
         Some(ref ports) => {
@@ -174,7 +174,7 @@ fn handle_connection(mut conn: TcpStream, response: Option<&str>, port: u16) -> 
     };
 
     // TODO: Test if unwrapping here is safe (enough).
-        conn.write_all(
+    conn.write_all(
         format!(
             "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{}",
             response.len(),
@@ -207,7 +207,7 @@ pub fn cancel(port: u16) -> Result<(), std::io::Error> {
 }
 
 mod plugin_impl {
-    use tauri::{Manager, Runtime, Window};
+    use tauri::{Emitter, Manager, Runtime, Window};
 
     #[tauri::command]
     pub(crate) fn start<R: Runtime>(
